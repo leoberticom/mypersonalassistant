@@ -2230,6 +2230,8 @@ function AgencyOS() {
     projects: projects,
     clients: clients,
     clientName: clientName,
+    currentStateJson: state ? JSON.stringify(state) : "",
+    onSyncNow: applyRemoteUpdate,
     onEditProject: p => setEditingProject(p),
     onNewProject: () => setEditingProject({
       name: "",
@@ -4341,6 +4343,8 @@ function SettingsView({
   projects,
   clients,
   clientName,
+  currentStateJson,
+  onSyncNow,
   onEditProject,
   onNewProject,
   onDeleteProject
@@ -4371,6 +4375,7 @@ function SettingsView({
     setBackendConfig(backendUrl.trim(), backendToken.trim());
     setSavedBackend(true);
     setTimeout(() => setSavedBackend(false), 1500);
+    if (onSyncNow) onSyncNow();
   }
   async function testBackend() {
     setBackendConfig(backendUrl.trim(), backendToken.trim());
@@ -4379,14 +4384,19 @@ function SettingsView({
     const r = await remoteGet(STORAGE_KEY);
     let rSet;
     if (r && r.value && looksLikeValidState(r.value)) {
-      // scrive di nuovo esattamente gli stessi dati reali già presenti: verifica la scrittura senza cancellare nulla
+      // sul foglio ci sono già dati validi (magari di un altro dispositivo): li riscrive identici,
+      // verifica la scrittura senza cambiare nulla
       rSet = await remoteSet(STORAGE_KEY, r.value);
+    } else if (currentStateJson && looksLikeValidState(currentStateJson)) {
+      // niente di valido sul foglio: ci mette i dati reali già presenti su QUESTO dispositivo,
+      // mai un dato finto o generico che rischi di sovrascrivere qualcosa
+      rSet = await remoteSet(STORAGE_KEY, currentStateJson);
     } else {
-      // nulla di valido ancora sul foglio: inizializza con una struttura vuota ma corretta, mai un oggetto finto
       rSet = await remoteSet(STORAGE_KEY, JSON.stringify(seedData()));
     }
     setTesting(false);
     setTestResult(rSet ? "ok" : "error");
+    if (rSet && onSyncNow) onSyncNow();
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "max-w-3xl mx-auto flex flex-col gap-4 aos-fade-in"
